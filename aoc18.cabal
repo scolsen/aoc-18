@@ -21,3 +21,11 @@ executable day-one
   default-language: Haskell2010
   build-depends:    base >= 4.3.0.0
   ghc-options:      -o bin/day-one
+
+executable day-one-pt-two 
+  main-is:          Main-Two.lhs
+  hs-source-dirs:   src/day-one
+  default-language: Haskell2010
+  build-depends:    base >= 4.3.0.0
+  ghc-options:      -o bin/day-one-pt-2
+
