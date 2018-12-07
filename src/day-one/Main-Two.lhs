@@ -67,16 +67,17 @@ We'll specify a recursive function for this purpose.
 >                  | otherwise   = g scn 
 >                  where scn = (scanl f z xs)
 
-> getfreq :: [(a, a)] -> [a] -> a
->
-> getfreq [] origin = getfreq (filter ((>=2) . snd)) 
->                   $ zip (scanl (+) (last origin) origin) (countEach origin)
->                   where rescan = scanl (+) (last scan) 
->
+We need to rescan >:|
 
-> getfreq [] ys = getfreq (filter ((>=2) . snd) 
->               $ zip (scanl (foldr (+) 0 ys) ys)) (countEach ys)
-> getfreq xs _  = fst . head . xs  
+< rescan f z xs = scanl f z xs : rescan f (foldl f z xs) xs
+Note lazy infinite list of scans.
+Use until predicate.
+
+> rescanl f z xs = rescanl f (last start) xs
+                 where start = scanl f z xs
+
+> until (not null (zip s count)) rescanl (+) 0   
+
 
 > stripPos :: String -> String
 > stripPos x  | '+' == head x = tail x
