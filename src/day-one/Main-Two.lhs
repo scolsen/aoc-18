@@ -30,54 +30,77 @@ scanning (+) 0 over [1, 2, 3]  results in a list: [0, 0 + 1, (0 + 1) + 2, ...].
 We can use this function to generate a list of every intermediate value. We'll
 read in inputs just as we did in part one of the problem.
 
-After we generate our list of intermediate values, we can solve the problem by
-finding the first member of the list that appears twice. In order to accomplish
-this, we can first count the number of instances of each element in our
-intermediate values list and produce a new list that contains a tuple of each
-element and its count. We'll need a count function to count the number of
-instances of the element and `zip` to zip our counts up with the element.
+We're not finished after we generate our list of intermediate values, however.
+A number may not repeat in the first list of intermediates. As the problem
+specifies, if that happens to be the case, we're to reapply the entire sequence
+using the last frequency (the last element in our scan) as the first input.
 
-To count the number of elements in a list, we can filter the list to only those
-elements, and then return the length of the resulting list:
+This being the case, we need to establish a means of producing a continuous
+list of sequential scans until a number repeats more than once in one of the 
+scans. We can write a function to accomplish this:
 
-> count x = length . filter (==x)
+> rescan :: (t -> t -> t) -> t -> [t] -> [[t]]
+> rescan f z = iterate scan
+>            where scan = last . scanl f z >>= scanl f
 
-We can then explicitly map this function against our list of values and zip the
-result together with our initial values:
+The rescan function iterates over scans, using the `last` value of the prior
+scan as input to the next iteration. It produces an infinite list of scans.
 
-> countEach xs = map (\x -> count x xs) xs
+Now that we have our infinite wealth of scans, we need to stop scanning once
+we've solved the problem. In this case, our scans should cease once we've 
+produced a scan that contains a value more than once. To accomplish this, we'll
+need a means of counting the instances of the values in our scans. A simple 
+count function will serve us just fine here.
 
-Then we zip
+> count :: Eq a => a -> [a] -> Int
+> count x = length . filter (==x) 
 
-< let results = scanr (+) 0 inputs 
-< let withCounts = zip results (countEach results)
+Finally, we can set up a function that runs our scan iteration until the
+condition we're looking for is satisfied:
 
-We then simply take the first result that has a count of two.
+> scanUntil :: ([t] -> Bool) -> (t -> t -> t) -> t -> [t] -> [t]
+> scanUntil p f z = go . rescan f z 
+>                 where go (x:xs) | p x       = x
+>                                 | otherwise = go xs
 
-< fst . head . filter ((>=2). snd) $ withCounts
+Unfortunately, our scanUntil function returns the first element to satisfy a
+given predicate, which is a list in this case. What we really need, however, 
+is the number that satisfies our count predicate. In order to dig into our 
+structure and pull out that grimy value, we'll have to map over counts, and 
+discard any of the scan lists that don't result in a map with at least one member
+that has a 2.
 
-Now, to our main program:
+To map our count function, we can use a nice utility function rather than
+explicitly write a lambda to count each member against the list:
 
-Part of the problem too, involves *continuing* processing the frequency if no initial input occurs twice.
-We'll specify a recursive function for this purpose.
+> introspect :: Functor f => (a -> f a -> b) -> f a -> f b
+> introspect f xs = fmap ff xs
+>                 where ff = flip f xs . id
 
-> scanner ::
->
-> scanner g f z xs | g scn == [] = scanner g f (last scn) xs 
->                  | otherwise   = g scn 
->                  where scn = (scanl f z xs)
+Introspect lets us write:
 
-We need to rescan >:|
+< introspect count [...]
 
-< rescan f z xs = scanl f z xs : rescan f (foldl f z xs) xs
-Note lazy infinite list of scans.
-Use until predicate.
+Instead of having to write a lambda to map our count function against a list,
+such as:
 
-> rescanl f z xs = rescanl f (last start) xs
-                 where start = scanl f z xs
+< countEach xs = map (\x -> count x xs) xs
 
-> until (not null (zip s count)) rescanl (+) 0   
+The `any` function will let us verify whether or not the result of introspect
+contains any count values greater than two. If so, that's the list we need.
 
+< any (>2) . introspect count
+
+We can name this modest composition:
+
+> hasDuplicates :: Eq a => [a] -> Bool
+> hasDuplicates = any (>=2) . introspect count
+
+Our final scan solution is nice and tidy:
+
+< scanUntil hasDuplicates (+) 0 inputs
+
+Finally, we can write the complete solution:
 
 > stripPos :: String -> String
 > stripPos x  | '+' == head x = tail x
@@ -87,7 +110,8 @@ Use until predicate.
 >   inputs     <- fmap lines (readFile "./inputs/day-one.txt")
 >   normalized <- return $ map stripPos inputs
 >   numbers    <- return $ map read normalized
->   answer     <- return $ getfreq [] numbers
->   print answer
+>   scan       <- return $ scanUntil hasDuplicates (+) 0 numbers
+>   counts     <- return $ zip (introspect count scan) scan
+>   print counts
 
 That's it!
