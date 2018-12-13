@@ -39,9 +39,9 @@ This being the case, we need to establish a means of producing a continuous
 list of sequential scans until a number repeats more than once in one of the 
 scans. We can write a function to accomplish this:
 
-> rescan :: (t -> t -> t) -> t -> [t] -> [[t]]
-> rescan f z = iterate scan
->            where scan = last . scanl f z >>= scanl f
+< rescan :: (t -> t -> t) -> t -> [t] -> [[t]]
+< rescan f z = iterate scan
+<            where scan = last . scanl f z >>= scanl f
 
 The rescan function iterates over scans, using the `last` value of the prior
 scan as input to the next iteration. It produces an infinite list of scans.
@@ -52,16 +52,16 @@ produced a scan that contains a value more than once. To accomplish this, we'll
 need a means of counting the instances of the values in our scans. A simple 
 count function will serve us just fine here.
 
-> count :: Eq a => a -> [a] -> Int
-> count x = length . filter (==x) 
+< count :: Eq a => a -> [a] -> Int
+< count = (.) length . filter . (==) 
 
 Finally, we can set up a function that runs our scan iteration until the
 condition we're looking for is satisfied:
 
-> scanUntil :: ([t] -> Bool) -> (t -> t -> t) -> t -> [t] -> [t]
-> scanUntil p f z = go . rescan f z 
->                 where go (x:xs) | p x       = x
->                                 | otherwise = go xs
+< scanUntil :: ([t] -> Bool) -> (t -> t -> t) -> t -> [t] -> [t]
+< scanUntil p f z = go . rescan f z 
+<                 where go (x:xs) | p x       = x
+<                                 | otherwise = go xs
 
 Unfortunately, our scanUntil function returns the first element to satisfy a
 given predicate, which is a list in this case. What we really need, however, 
@@ -73,9 +73,9 @@ that has a 2.
 To map our count function, we can use a nice utility function rather than
 explicitly write a lambda to count each member against the list:
 
-> introspect :: Functor f => (a -> f a -> b) -> f a -> f b
-> introspect f xs = fmap ff xs
->                 where ff = flip f xs . id
+< introspect :: Functor f => (a -> f a -> b) -> f a -> f b
+< introspect f xs = fmap ff xs
+<                 where ff = flip f xs . id
 
 Introspect lets us write:
 
@@ -93,8 +93,8 @@ contains any count values greater than two. If so, that's the list we need.
 
 We can name this modest composition:
 
-> hasDuplicates :: Eq a => [a] -> Bool
-> hasDuplicates = any (>=2) . introspect count
+< hasDuplicates :: Eq a => [a] -> Bool
+< hasDuplicates = any (>=2) . introspect count
 
 Our final scan solution is nice and tidy:
 
@@ -106,12 +106,23 @@ Finally, we can write the complete solution:
 > stripPos x  | '+' == head x = tail x
 >             | otherwise     = x
 >
+> scanls :: (b -> a -> b) -> b -> [a] -> [b]
+> scanls f z xs = scanl f z (cycle xs)
+>
+> firstRepeat :: Eq t => [t] -> t 
+> firstRepeat xs = go xs xs 
+>                where go (n:ns) (_:y:ys)
+>                       | n == y    = go' xs ns
+>                       | otherwise = go ns ys
+>                      go' (n:ns) (y:ys)
+>                       | n == y    = n
+>                       | otherwise = go' ns ys
+>
 > main = do
 >   inputs     <- fmap lines (readFile "./inputs/day-one.txt")
 >   normalized <- return $ map stripPos inputs
 >   numbers    <- return $ map read normalized
->   scan       <- return $ scanUntil hasDuplicates (+) 0 numbers
->   counts     <- return $ zip (introspect count scan) scan
->   print counts
+>   answer     <- return $ firstRepeat $ scanls (+) 0 numbers
+>   print answer
 
 That's it!
